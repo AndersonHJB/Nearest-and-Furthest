@@ -30,13 +30,20 @@ double standard_distance(const Point& p1, const Point& p2) {
     return sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2));
 }
 
+// 计算环绕几何距离
+double wraparound_distance(const Point& p1, const Point& p2) {
+    double dx = std::min(std::abs(p2.x - p1.x), 1 - std::abs(p2.x - p1.x));
+    double dy = std::min(std::abs(p2.y - p1.y), 1 - std::abs(p2.y - p1.y));
+    return sqrt(dx * dx + dy * dy);
+}
+
 int main(int argc, char *argv[]) {
 
     std::vector<Point> points = read_csv("data/100000 locations.csv");
     // std::cout << points.size() << std::endl;
     // std::cout << points.data() << std::endl;
-    // std::cout << "Loaded points from CSV:" << std::endl;
-    // for (size_t i = 0; i < points.size(); ++i) {
-    //     std::cout << "Point " << i + 1 << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
-    // }
+    std::cout << "Loaded points from CSV:" << std::endl;
+    for (size_t i = 0; i < points.size(); ++i) {
+        std::cout << "Point " << i + 1 << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
+    }
 }
