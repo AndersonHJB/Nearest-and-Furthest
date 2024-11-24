@@ -38,8 +38,7 @@ double wraparound_distance(const Point& p1, const Point& p2) {
 }
 
 // 计算最近和最远距离
-void computeDistances(const std::vector<Point>& points, bool useWraparound,
-                      std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
+void computeDistances(const std::vector<Point>& points, bool useWraparound, std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
     size_t n = points.size();
     nearestDistances.resize(n, std::numeric_limits<double>::max());
     furthestDistances.resize(n, 0.0);
