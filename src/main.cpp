@@ -57,15 +57,58 @@ void computeDistances(const std::vector<Point>& points, bool useWraparound,
     }
 }
 
-int main(int argc, char *argv[]) {
+// 处理单个文件
+void processFile(const std::string& filename, const std::string& outputPrefix) {
+    std::vector<Point> points = readPointsFromCSV(filename);
+    std::cout << points.size() << std::endl;
+    std::vector<double> nearestDistances, furthestDistances;
 
-    std::vector<Point> points = readPointsFromCSV("data/100000 locations.csv");
-    // std::cout << points.size() << std::endl;
-    // std::cout << points.data() << std::endl;
-    std::cout << "Loaded points from CSV:" << std::endl;
+    // 普通几何
+    computeDistances(points, false, nearestDistances, furthestDistances);
+
+    // 输出结果
+    std::ofstream nearestOut(outputPrefix + "_nearest_standard.txt");
+    std::ofstream furthestOut(outputPrefix + "_furthest_standard.txt");
     for (size_t i = 0; i < points.size(); ++i) {
-        std::cout << "Point " << i + 1 << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
+        nearestOut << nearestDistances[i] << "\n";
+        furthestOut << furthestDistances[i] << "\n";
     }
+    nearestOut.close();
+    furthestOut.close();
+
+    // 环绕几何
+    computeDistances(points, true, nearestDistances, furthestDistances);
+
+    nearestOut.open(outputPrefix + "_nearest_wraparound.txt");
+    furthestOut.open(outputPrefix + "_furthest_wraparound.txt");
+    for (size_t i = 0; i < points.size(); ++i) {
+        nearestOut << nearestDistances[i] << "\n";
+        furthestOut << furthestDistances[i] << "\n";
+    }
+
+    // 打印平均距离
+    double nearestSum = 0.0, furthestSum = 0.0;
+    for (double d : nearestDistances) nearestSum += d;
+    for (double d : furthestDistances) furthestSum += d;
+
+    std::cout << "File: " << filename << "\n";
+    std::cout << "Average nearest distance: " << (nearestSum / points.size()) << "\n";
+    std::cout << "Average furthest distance: " << (furthestSum / points.size()) << "\n";
+}
+
+int main(int argc, char *argv[]) {
+    // 处理文件 1: 100000 locations.csv
+    processFile("data/100000 locations.csv", "output_100000");
+    processFile("data/200000 locations.csv", "output_200000");
+
+    return 0;
+    // std::vector<Point> points = readPointsFromCSV("data/100000 locations.csv");
+    // // std::cout << points.size() << std::endl;
+    // // std::cout << points.data() << std::endl;
+    // std::cout << "Loaded points from CSV:" << std::endl;
+    // for (size_t i = 0; i < points.size(); ++i) {
+    //     std::cout << "Point " << i + 1 << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
+    // }
     // std::vector<Point> points = readPointsFromCSV("data/100000 locations.csv");
     // if (points.empty()) {
     //     std::cerr << "Error: No points were read from the file!" << std::endl;
