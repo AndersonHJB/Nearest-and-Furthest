@@ -10,23 +10,23 @@ def read_distances(file_path):
 # 绘制直方图
 def plot_histogram(data, title, xlabel, output_file):
     plt.figure(figsize=(10, 6))
-    plt.hist(data, bins=50, edgecolor="black", alpha=0.7)
+    plt.hist(data, bins=50, edgecolor='black', alpha=0.7)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel("Frequency")
-    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
-    print(f"Histogram saved to {output_file}")
+    print("Histogram plot saved to {}".format(output_file))
 
-# 处理单个文件集（普通和环绕几何）
+# 处理单个文件集(普通和环绕几何）
 def process_results(file_prefix):
     # 文件路径
-    nearest_standard_file = f"{file_prefix}_nearest_standard.txt"
-    furthest_standard_file = f"{file_prefix}_furthest_standard.txt"
-    nearest_wraparound_file = f"{file_prefix}_nearest_wraparound.txt"
-    furthest_wraparound_file = f"{file_prefix}_furthest_wraparound.txt"
+    nearest_standard_file = f'../{file_prefix}_nearest_standard.txt'
+    furthest_standard_file = f"../{file_prefix}_furthest_standard.txt"
+    nearest_wraparound_file = f"../{file_prefix}_nearest_wraparound.txt"
+    furthest_wraparound_file = f"../{file_prefix}_furthest_wraparound.txt"
 
     # 读取数据
     nearest_standard = read_distances(nearest_standard_file)
@@ -44,6 +44,7 @@ def process_results(file_prefix):
     plot_histogram(furthest_wraparound, "Furthest Distance (Wraparound Geometry)", "Distance",
                    f"{file_prefix}_furthest_wraparound_hist.png")
 
+
 # 主程序
 if __name__ == "__main__":
     # 处理文件 1: 100000 locations
@@ -51,3 +52,6 @@ if __name__ == "__main__":
 
     # 处理文件 2: 200000 locations
     process_results("output_200000")
+
+
+
