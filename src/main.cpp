@@ -5,10 +5,25 @@
 #include <sstream>
 #include <limits>
 #include <omp.h>
+`#include <random>
+#include <chrono>
 
 struct Point {
     double x, y;
 };
+
+// 随机生成点
+std::vector<Point> generateRandomPoints(size_t numPoints) {
+    std::vector<Point> points;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+
+    for (size_t i = 0; i < numPoints; ++i) {
+        points.push_back({dis(gen), dis(gen)});
+    }
+    return points;
+}
 
 // 从 CSV 文件读取点
 std::vector<Point> readPointsFromCSV(const std::string& filename) {
@@ -37,86 +52,84 @@ double wraparoundDistance(const Point& a, const Point& b) {
     return std::sqrt(dx * dx + dy * dy);
 }
 
-// 计算最近和最远距离
+// 计算最近和最远距离（优化避免重复计算）
 void computeDistances(const std::vector<Point>& points, bool useWraparound,
                       std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
     size_t n = points.size();
     nearestDistances.resize(n, std::numeric_limits<double>::max());
     furthestDistances.resize(n, 0.0);
 
+    // 并行计算距离
 #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            if (i != j) {
-                double dist = useWraparound ? wraparoundDistance(points[i], points[j])
-                                            : standardDistance(points[i], points[j]);
+        for (size_t j = i + 1; j < n; ++j) {
+            double dist = useWraparound ? wraparoundDistance(points[i], points[j])
+                                        : standardDistance(points[i], points[j]);
+            // 更新最近和最远距离
+#pragma omp critical
+            {
                 nearestDistances[i] = std::min(nearestDistances[i], dist);
                 furthestDistances[i] = std::max(furthestDistances[i], dist);
+                nearestDistances[j] = std::min(nearestDistances[j], dist);
+                furthestDistances[j] = std::max(furthestDistances[j], dist);
             }
         }
     }
 }
 
-// 处理单个文件
-void processFile(const std::string& filename, const std::string& outputPrefix) {
-    std::vector<Point> points = readPointsFromCSV(filename);
-    std::cout << points.size() << std::endl;
+// 输出结果到文件
+void writeResults(const std::string& filename, const std::vector<double>& data) {
+    std::ofstream file(filename);
+    for (double value : data) {
+        file << value << "\n";
+    }
+    file.close();
+}
+
+// 测试单个数据集
+void processDataset(const std::string& description, const std::vector<Point>& points, const std::string& outputPrefix) {
+    std::cout << "Processing dataset: " << description << "\n";
+
     std::vector<double> nearestDistances, furthestDistances;
 
-    // 普通几何
+    // 普通几何距离
+    auto start = std::chrono::high_resolution_clock::now();
     computeDistances(points, false, nearestDistances, furthestDistances);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Standard geometry completed in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms\n";
 
-    // 输出结果
-    std::ofstream nearestOut(outputPrefix + "_nearest_standard.txt");
-    std::ofstream furthestOut(outputPrefix + "_furthest_standard.txt");
-    for (size_t i = 0; i < points.size(); ++i) {
-        nearestOut << nearestDistances[i] << "\n";
-        furthestOut << furthestDistances[i] << "\n";
-    }
-    nearestOut.close();
-    furthestOut.close();
+    writeResults(outputPrefix + "_nearest_standard.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_standard.txt", furthestDistances);
 
-    // 环绕几何
+    // 环绕几何距离
+    start = std::chrono::high_resolution_clock::now();
     computeDistances(points, true, nearestDistances, furthestDistances);
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Wraparound geometry completed in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms\n";
 
-    nearestOut.open(outputPrefix + "_nearest_wraparound.txt");
-    furthestOut.open(outputPrefix + "_furthest_wraparound.txt");
-    for (size_t i = 0; i < points.size(); ++i) {
-        nearestOut << nearestDistances[i] << "\n";
-        furthestOut << furthestDistances[i] << "\n";
-    }
+    writeResults(outputPrefix + "_nearest_wraparound.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_wraparound.txt", furthestDistances);
 
     // 打印平均距离
     double nearestSum = 0.0, furthestSum = 0.0;
     for (double d : nearestDistances) nearestSum += d;
     for (double d : furthestDistances) furthestSum += d;
 
-    std::cout << "File: " << filename << "\n";
     std::cout << "Average nearest distance: " << (nearestSum / points.size()) << "\n";
     std::cout << "Average furthest distance: " << (furthestSum / points.size()) << "\n";
 }
 
-int main(int argc, char *argv[]) {
-    // 处理文件 1: 100000 locations.csv
-    processFile("data/100000 locations.csv", "output_100000");
-    processFile("data/200000 locations.csv", "output_200000");
+int main() {
+    // 处理随机生成的数据集
+    size_t numPoints = 100000;
+    std::vector<Point> randomPoints = generateRandomPoints(numPoints);
+    processDataset("Random points (100,000)", randomPoints, "output_random");
+
+    // 处理 CSV 数据集
+    std::vector<Point> csvPoints = readPointsFromCSV("data/100000 locations.csv");
+    processDataset("CSV points (100,000)", csvPoints, "output_csv");
 
     return 0;
-    // std::vector<Point> points = readPointsFromCSV("data/100000 locations.csv");
-    // // std::cout << points.size() << std::endl;
-    // // std::cout << points.data() << std::endl;
-    // std::cout << "Loaded points from CSV:" << std::endl;
-    // for (size_t i = 0; i < points.size(); ++i) {
-    //     std::cout << "Point " << i + 1 << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
-    // }
-    // std::vector<Point> points = readPointsFromCSV("data/100000 locations.csv");
-    // if (points.empty()) {
-    //     std::cerr << "Error: No points were read from the file!" << std::endl;
-    // } else {
-    //     std::cout << "Successfully read " << points.size() << " points from the file." << std::endl;
-    //     for (size_t i = 0; i < std::min(points.size(), size_t(10)); ++i) {
-    //         std::cout << "Point " << i << ": (" << points[i].x << ", " << points[i].y << ")" << std::endl;
-    //     }
-    // }
-
 }
