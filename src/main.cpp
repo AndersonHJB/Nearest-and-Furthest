@@ -54,10 +54,13 @@ double wraparoundDistance(const Point& a, const Point& b) {
 
 // 串行计算最近和最远距离
 void computeDistancesSerial(const std::vector<Point>& points, bool useWraparound,
-                            std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
+                            std::vector<double>& nearestDistances, std::vector<double>& furthestDistances,
+                            double& avgNearest, double& avgFurthest) {
     size_t n = points.size();
     nearestDistances.resize(n, std::numeric_limits<double>::max());
     furthestDistances.resize(n, 0.0);
+    avgNearest = 0.0;
+    avgFurthest = 0.0;
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = i + 1; j < n; ++j) {
@@ -68,30 +71,63 @@ void computeDistancesSerial(const std::vector<Point>& points, bool useWraparound
             nearestDistances[j] = std::min(nearestDistances[j], dist);
             furthestDistances[j] = std::max(furthestDistances[j], dist);
         }
+        avgNearest += nearestDistances[i];
+        avgFurthest += furthestDistances[i];
     }
+
+    // 计算平均值
+    avgNearest /= n;
+    avgFurthest /= n;
 }
 
 // 并行计算最近和最远距离
 void computeDistancesParallel(const std::vector<Point>& points, bool useWraparound,
-                              std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
+                              std::vector<double>& nearestDistances, std::vector<double>& furthestDistances,
+                              double& avgNearest, double& avgFurthest) {
     size_t n = points.size();
     nearestDistances.resize(n, std::numeric_limits<double>::max());
     furthestDistances.resize(n, 0.0);
+    std::vector<double> nearestSums(n, 0.0);
+    std::vector<double> furthestSums(n, 0.0);
 
-#pragma omp parallel for schedule(dynamic)
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = i + 1; j < n; ++j) {
-            double dist = useWraparound ? wraparoundDistance(points[i], points[j])
-                                        : standardDistance(points[i], points[j]);
+#pragma omp parallel
+    {
+        std::vector<double> localNearestDistances(n, std::numeric_limits<double>::max());
+        std::vector<double> localFurthestDistances(n, 0.0);
+
+#pragma omp for schedule(dynamic)
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = i + 1; j < n; ++j) {
+                double dist = useWraparound ? wraparoundDistance(points[i], points[j])
+                                            : standardDistance(points[i], points[j]);
+
+                // 更新i和j的最近和最远距离
+                if (dist < localNearestDistances[i]) localNearestDistances[i] = dist;
+                if (dist > localFurthestDistances[i]) localFurthestDistances[i] = dist;
+                if (dist < localNearestDistances[j]) localNearestDistances[j] = dist;
+                if (dist > localFurthestDistances[j]) localFurthestDistances[j] = dist;
+            }
+        }
+
+        // 合并结果
 #pragma omp critical
-            {
-                nearestDistances[i] = std::min(nearestDistances[i], dist);
-                furthestDistances[i] = std::max(furthestDistances[i], dist);
-                nearestDistances[j] = std::min(nearestDistances[j], dist);
-                furthestDistances[j] = std::max(furthestDistances[j], dist);
+        {
+            for (size_t i = 0; i < n; ++i) {
+                if (localNearestDistances[i] < nearestDistances[i]) nearestDistances[i] = localNearestDistances[i];
+                if (localFurthestDistances[i] > furthestDistances[i]) furthestDistances[i] = localFurthestDistances[i];
             }
         }
     }
+
+    // 计算平均值
+    avgNearest = 0.0;
+    avgFurthest = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        avgNearest += nearestDistances[i];
+        avgFurthest += furthestDistances[i];
+    }
+    avgNearest /= n;
+    avgFurthest /= n;
 }
 
 // 输出结果到文件
@@ -108,43 +144,52 @@ void processDataset(const std::string& description, const std::vector<Point>& po
     std::cout << "Processing dataset: " << description << "\n";
 
     std::vector<double> nearestDistances, furthestDistances;
+    double avgNearest = 0.0, avgFurthest = 0.0;
 
     // 串行：普通几何
     auto start = std::chrono::high_resolution_clock::now();
-    computeDistancesSerial(points, false, nearestDistances, furthestDistances);
+    computeDistancesSerial(points, false, nearestDistances, furthestDistances, avgNearest, avgFurthest);
     auto end = std::chrono::high_resolution_clock::now();
     double duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
     std::cout << "Serial (standard geometry) completed in " << duration << " seconds\n";
+    std::cout << "Average nearest distance: " << avgNearest << "\n";
+    std::cout << "Average furthest distance: " << avgFurthest << "\n\n";
 
     writeResults(outputPrefix + "_nearest_standard_serial.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_standard_serial.txt", furthestDistances);
 
     // 并行：普通几何
     start = std::chrono::high_resolution_clock::now();
-    computeDistancesParallel(points, false, nearestDistances, furthestDistances);
+    computeDistancesParallel(points, false, nearestDistances, furthestDistances, avgNearest, avgFurthest);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
     std::cout << "Parallel (standard geometry) completed in " << duration << " seconds\n";
+    std::cout << "Average nearest distance: " << avgNearest << "\n";
+    std::cout << "Average furthest distance: " << avgFurthest << "\n\n";
 
     writeResults(outputPrefix + "_nearest_standard_parallel.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_standard_parallel.txt", furthestDistances);
 
     // 串行：环绕几何
     start = std::chrono::high_resolution_clock::now();
-    computeDistancesSerial(points, true, nearestDistances, furthestDistances);
+    computeDistancesSerial(points, true, nearestDistances, furthestDistances, avgNearest, avgFurthest);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
     std::cout << "Serial (wraparound geometry) completed in " << duration << " seconds\n";
+    std::cout << "Average nearest distance: " << avgNearest << "\n";
+    std::cout << "Average furthest distance: " << avgFurthest << "\n\n";
 
     writeResults(outputPrefix + "_nearest_wraparound_serial.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_wraparound_serial.txt", furthestDistances);
 
     // 并行：环绕几何
     start = std::chrono::high_resolution_clock::now();
-    computeDistancesParallel(points, true, nearestDistances, furthestDistances);
+    computeDistancesParallel(points, true, nearestDistances, furthestDistances, avgNearest, avgFurthest);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
     std::cout << "Parallel (wraparound geometry) completed in " << duration << " seconds\n";
+    std::cout << "Average nearest distance: " << avgNearest << "\n";
+    std::cout << "Average furthest distance: " << avgFurthest << "\n\n";
 
     writeResults(outputPrefix + "_nearest_wraparound_parallel.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_wraparound_parallel.txt", furthestDistances);
