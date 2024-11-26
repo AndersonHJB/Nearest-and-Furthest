@@ -52,20 +52,37 @@ double wraparoundDistance(const Point& a, const Point& b) {
     return std::sqrt(dx * dx + dy * dy);
 }
 
-// 计算最近和最远距离（优化避免重复计算）
-void computeDistances(const std::vector<Point>& points, bool useWraparound,
-                      std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
+// 串行计算最近和最远距离
+void computeDistancesSerial(const std::vector<Point>& points, bool useWraparound,
+                            std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
     size_t n = points.size();
     nearestDistances.resize(n, std::numeric_limits<double>::max());
     furthestDistances.resize(n, 0.0);
 
-    // 并行计算距离
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = i + 1; j < n; ++j) {
+            double dist = useWraparound ? wraparoundDistance(points[i], points[j])
+                                        : standardDistance(points[i], points[j]);
+            nearestDistances[i] = std::min(nearestDistances[i], dist);
+            furthestDistances[i] = std::max(furthestDistances[i], dist);
+            nearestDistances[j] = std::min(nearestDistances[j], dist);
+            furthestDistances[j] = std::max(furthestDistances[j], dist);
+        }
+    }
+}
+
+// 并行计算最近和最远距离
+void computeDistancesParallel(const std::vector<Point>& points, bool useWraparound,
+                              std::vector<double>& nearestDistances, std::vector<double>& furthestDistances) {
+    size_t n = points.size();
+    nearestDistances.resize(n, std::numeric_limits<double>::max());
+    furthestDistances.resize(n, 0.0);
+
 #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = i + 1; j < n; ++j) {
             double dist = useWraparound ? wraparoundDistance(points[i], points[j])
                                         : standardDistance(points[i], points[j]);
-            // 更新最近和最远距离
 #pragma omp critical
             {
                 nearestDistances[i] = std::min(nearestDistances[i], dist);
@@ -92,34 +109,45 @@ void processDataset(const std::string& description, const std::vector<Point>& po
 
     std::vector<double> nearestDistances, furthestDistances;
 
-    // 普通几何距离
+    // 串行：普通几何
     auto start = std::chrono::high_resolution_clock::now();
-    computeDistances(points, false, nearestDistances, furthestDistances);
+    computeDistancesSerial(points, false, nearestDistances, furthestDistances);
     auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
-    std::cout << "Standard geometry completed in "<< duration.count() << " seconds\n";
+    double duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+    std::cout << "Serial (standard geometry) completed in " << duration << " seconds\n";
 
-    writeResults(outputPrefix + "_nearest_standard.txt", nearestDistances);
-    writeResults(outputPrefix + "_furthest_standard.txt", furthestDistances);
+    writeResults(outputPrefix + "_nearest_standard_serial.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_standard_serial.txt", furthestDistances);
 
-    // 环绕几何距离
+    // 并行：普通几何
     start = std::chrono::high_resolution_clock::now();
-    computeDistances(points, true, nearestDistances, furthestDistances);
+    computeDistancesParallel(points, false, nearestDistances, furthestDistances);
     end = std::chrono::high_resolution_clock::now();
-    duration = end - start;
-    std::cout << "Wraparound geometry completed in "
-              << duration.count() << " seconds\n";
+    duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+    std::cout << "Parallel (standard geometry) completed in " << duration << " seconds\n";
 
-    writeResults(outputPrefix + "_nearest_wraparound.txt", nearestDistances);
-    writeResults(outputPrefix + "_furthest_wraparound.txt", furthestDistances);
+    writeResults(outputPrefix + "_nearest_standard_parallel.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_standard_parallel.txt", furthestDistances);
 
-    // 打印平均距离
-    double nearestSum = 0.0, furthestSum = 0.0;
-    for (double d : nearestDistances) nearestSum += d;
-    for (double d : furthestDistances) furthestSum += d;
+    // 串行：环绕几何
+    start = std::chrono::high_resolution_clock::now();
+    computeDistancesSerial(points, true, nearestDistances, furthestDistances);
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+    std::cout << "Serial (wraparound geometry) completed in " << duration << " seconds\n";
 
-    std::cout << "Average nearest distance: " << (nearestSum / points.size()) << "\n";
-    std::cout << "Average furthest distance: " << (furthestSum / points.size()) << "\n";
+    writeResults(outputPrefix + "_nearest_wraparound_serial.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_wraparound_serial.txt", furthestDistances);
+
+    // 并行：环绕几何
+    start = std::chrono::high_resolution_clock::now();
+    computeDistancesParallel(points, true, nearestDistances, furthestDistances);
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+    std::cout << "Parallel (wraparound geometry) completed in " << duration << " seconds\n";
+
+    writeResults(outputPrefix + "_nearest_wraparound_parallel.txt", nearestDistances);
+    writeResults(outputPrefix + "_furthest_wraparound_parallel.txt", furthestDistances);
 }
 
 int main() {
