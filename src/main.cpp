@@ -5,7 +5,7 @@
 #include <sstream>
 #include <limits>
 #include <omp.h>
-`#include <random>
+#include <random>
 #include <chrono>
 
 struct Point {
@@ -96,8 +96,8 @@ void processDataset(const std::string& description, const std::vector<Point>& po
     auto start = std::chrono::high_resolution_clock::now();
     computeDistances(points, false, nearestDistances, furthestDistances);
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "Standard geometry completed in "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms\n";
+    std::chrono::duration<double> duration = end - start;
+    std::cout << "Standard geometry completed in "<< duration.count() << " seconds\n";
 
     writeResults(outputPrefix + "_nearest_standard.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_standard.txt", furthestDistances);
@@ -106,8 +106,9 @@ void processDataset(const std::string& description, const std::vector<Point>& po
     start = std::chrono::high_resolution_clock::now();
     computeDistances(points, true, nearestDistances, furthestDistances);
     end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
     std::cout << "Wraparound geometry completed in "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms\n";
+              << duration.count() << " seconds\n";
 
     writeResults(outputPrefix + "_nearest_wraparound.txt", nearestDistances);
     writeResults(outputPrefix + "_furthest_wraparound.txt", furthestDistances);
