@@ -86,6 +86,9 @@ void computeDistancesSerial(const std::vector<Point>& points, bool useWraparound
             avgNearest += nearest;
             avgFurthest += furthest;
         }
+        // 计算平均值
+        avgNearest /= n;
+        avgFurthest /= n;
     } else {
         // 优化算法：距离计算一次
         for (size_t i = 0; i < n; ++i) {
@@ -100,9 +103,9 @@ void computeDistancesSerial(const std::vector<Point>& points, bool useWraparound
             avgNearest += nearestDistances[i];
             avgFurthest += furthestDistances[i];
         }
+        avgNearest /= n;
+        avgFurthest /= n;
     }
-    avgNearest /= n;
-    avgFurthest /= n;
 }
 
 // 并行计算最近和最远距离
@@ -148,6 +151,9 @@ void computeDistancesParallel(const std::vector<Point>& points, bool useWraparou
             avgNearest += nearest;
             avgFurthest += furthest;
         }
+        // **修正：计算平均值**
+        avgNearest /= n;
+        avgFurthest /= n;
     } else {
         // 优化算法：距离计算一次
         std::vector<double> localNearestDistances(n, std::numeric_limits<double>::max());
