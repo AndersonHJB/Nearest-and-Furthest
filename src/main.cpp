@@ -315,11 +315,11 @@ int main(int argc, char* argv[]) {
 
     // 处理 CSV 数据集
     std::vector<Point> csvPoints = readPointsFromCSV("data/100000 locations.csv");
-    processDataset("CSV points (100,000)", csvPoints, "output_csv", numThreads, scheduleType, chunkSize,
+    processDataset("CSV points (100,000)", csvPoints, "100000_output_csv", numThreads, scheduleType, chunkSize,
                    useNaiveAlgorithm);
 
-    std::vector<Point> csvPoints2 = readPointsFromCSV("data/100000 locations.csv");
-    processDataset("CSV points (100,000)", csvPoints2, "output_csv", numThreads, scheduleType, chunkSize,
+    std::vector<Point> csvPoints2 = readPointsFromCSV("data/200000 locations.csv");
+    processDataset("CSV points (200,000)", csvPoints2, "200000_output_csv", numThreads, scheduleType, chunkSize,
                    useNaiveAlgorithm);
 
     return 0;
